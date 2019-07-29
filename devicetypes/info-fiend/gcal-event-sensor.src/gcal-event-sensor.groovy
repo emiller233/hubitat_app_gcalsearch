@@ -1,5 +1,6 @@
 /**
  *  Copyright 2017 Mike Nestor & Anthony Pastor
+ *  Hubitat conversion by cometfish.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -154,7 +155,7 @@ metadata {
         valueTile("eventTitle", "device.eventTitle", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
             state "default", label:'${currentValue}'
         }
-        
+        /*
         htmlTile(name:"mapHTML",
 				action: "getMapHTML",
 				refreshInterval: 1,
@@ -162,16 +163,16 @@ metadata {
 				height: 12,
 				whitelist: ["www.google.com", "maps.googleapis.com"]
         )
-        
+        */
 		main "status"
 		details(["eventTitle", "summary", "status", "refresh", "deleteInfo"])	
         			//"closeBtn", "openBtn",  , "startMsgTime", "startMsg", "endMsgTime", "endMsg", , "offsetNotify", "eventTime", "mapHTML",
 	}
 }
-
+/*
 mappings {
 	path("/getMapHTML") {action: [GET: "getMapHTML"]}
-}
+}*/
 
 def installed() {
     log.trace "GCalEventSensor: installed()"
@@ -290,8 +291,10 @@ void poll() {
             def evtLocation
             if ( event?.location ) {
             	evtLocation = event.location
-            }    
-            sendEvent("name":"location", "value":evtLocation, displayed: false)             	           
+                sendEvent("name":"location", "value":evtLocation, displayed: false)
+            }    else {
+                sendEvent("name":"location", "value":" ", displayed: false)
+            }
             
 			// Get event start and end times
 	        def startTime

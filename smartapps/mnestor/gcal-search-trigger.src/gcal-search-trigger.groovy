@@ -1,5 +1,6 @@
 /**
  *  Copyright 2017 Mike Nestor & Anthony Pastor
+ *  Hubitat conversion by cometfish.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -36,7 +37,7 @@
 definition(
     name: "GCal Search Trigger",
     namespace: "mnestor",
-    author: "Mike Nestor and Anthony Pastor",
+    author: "Mike Nestor and Anthony Pastor. Hubitat conversion by cometfish.",
     description: "Creates & Controls virtual contact (event) or presence sensors.",
     category: "My Apps",
     parent: "mnestor:GCal Search",
@@ -75,7 +76,7 @@ def selectCalendars() {
     return dynamicPage(name: "selectCalendars", title: "Create new calendar search", install: false, uninstall: state.installed, nextPage: "notifications" ) {
     	section("Required Info") {                               
                //we can't do multiple calendars because the api doesn't support it and it could potentially cause a lot of traffic to happen
-            input name: "watchCalendars", title:"", type: "enum", required:true, multiple:false, description: "Which calendar do you want to search?", metadata:[values:calendars], submitOnChange: true                
+            input name: "watchCalendars", title:"", type: "enum", required:true, multiple:false, description: "Which calendar do you want to search?", options:calendars, submitOnChange: true                
             input name: "eventOrPresence", title:"Type of Virtual Device to create?  Contact (for events) or Presence?", type: "enum", required:true, multiple:false, 
             		description: "Do you want this gCal Search Trigger to control a virtual Contact Sensor (for Events) or a virtual presence sensor?", options:["Contact", "Presence"]	//, defaultValue: "Contact"
                
@@ -344,7 +345,7 @@ private endMsg() {
 }
 
 
-private queueDeletionHandler() {
+def queueDeletionHandler() {
 	askAlexaMsgQueueDelete() 
 }
 
@@ -447,7 +448,7 @@ private deleteAllChildren() {
 }
 
 private childCreated() {
-    def isChild = getChildDevice(getDeviceID())
+    def isChild = getChildDevice(getDeviceID()) != null
     log.debug "childCreated? ${isChild}"
     return isChild
 }

@@ -1,5 +1,6 @@
 /**
- *  Copyright 2017 Mike Nestor & Anthony Pastor 
+ *  Copyright 2017 Mike Nestor & Anthony Pastor
+ *  Hubitat conversion by cometfish.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -15,26 +16,21 @@
 definition (
     name: "GCal Search",
     namespace: "mnestor",
-    author: "Mike Nestor & Anthony Pastor",
-    description: "Integrates SmartThings with Google Calendar events to trigger virtual event using contact sensor (or a virtual presence sensor).",
+    author: "Mike Nestor & Anthony Pastor. Hubitat conversion by cometfish.",
+    description: "Integrates Hubitat with Google Calendar events to trigger virtual event using contact sensor (or a virtual presence sensor).",
     category: "My Apps",
     iconUrl: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal.png",
     iconX2Url: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal%402x.png",
     iconX3Url: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal%402x.png",
     singleInstance: false,
-) {
-   appSetting "clientId"
-   appSetting "clientSecret"
-}
+)
 
 preferences {
 	page(name: "authentication", title: "Google Calendar Triggers", content: "mainPage", submitOnChange: true, uninstall: false, install: true)
+    
 	page name: "pageAbout"
-}
-
-mappings {
-	path("/oauth/initialize") {action: [GET: "oauthInitUrl"]}
-	path("/oauth/callback") {action: [GET: "callback"]}
+    page name: "pagePoll"
+    page name: "pageRestart"
 }
 
 private version() {
@@ -42,48 +38,56 @@ private version() {
 }
 
 def mainPage() {
-  	log.trace "mainPage(): appId = ${app.id}, apiServerUrl = ${ getApiServerUrl() }"
-	log.info "state.refreshToken = ${state.refreshToken}"
+	log.info "atomicState.refreshToken = ${atomicState.refreshToken}"
 
-   	if (!atomicState.accessToken && !state.refreshToken && !atomicState.refreshToken) {
-        log.debug "No access or refresh tokens found - calling createAccessToken()"
-        atomicState.authToken = null
-        atomicState.accessToken = createAccessToken()
-    } else {
-	    log.debug "Access token ${atomicState.accessToken} found - saving list of calendars."
-        if (!atomicState.refreshToken && !state.refreshToken) {
-        	log.debug "BUT...No refresh token found."
-        } else {        	
-            if (state.refreshToken) {
-        		log.debug "state.refreshToken ${atomicState.refreshToken} found"
-        	} else if (atomicState.refreshToken) {
-        		log.debug "atomicState.refreshToken ${atomicState.refreshToken} found"
-	        }             
-    	
-			state.myCals = getCalendarList()
-        }
-    }
-    
-    
     return dynamicPage(name: "authentication", uninstall: false) {
         if (!atomicState.authToken) {
 	        log.debug "No authToken found."
-            def redirectUrl = "https://graph.api.smartthings.com/oauth/initialize?appId=${app.id}&access_token=${atomicState.accessToken}&apiServerUrl=${getApiServerUrl()}"
-            log.debug "RedirectUrl = ${redirectUrl}"
+            log.debug gaClientID
+            if (!gaClientID || !gaClientSecret) {
+                section("Google Authentication"){
+                    paragraph "Enter your Google API credentials below"
+                    input "gaClientID", "text", title:"Google API Client ID", required: true
+                    input "gaClientSecret", "text", title:"Google API Client Secret", required: true
+                }
+            } else if (!atomicState.authToken) {
+                if (!atomicState.verificationUrl)
+                    oauthInitUrl()
+                else
+                    oauthPoll()
+                
+                if (!atomicState.authToken) {
+                  section("Google Authentication"){
+                    paragraph "Log in to Google and allow access for GCal Search, with code: "+ atomicState.userCode
+                    href url:atomicState.verificationUrl, style:"external", required:true, title:"Authenticate GCal Search", description:"Click to enter credentials"
+                      
+            href "pagePoll", title: "Check Authentication", description: "Click to check authentication once completed"
+        
+                  }
+                }
+            }
             
-            section("Google Authentication"){
-                paragraph "Tap below to log in to Google and authorize access for GCal Search."
-                href url:redirectUrl, style:"external", required:true, title:"", description:"Click to enter credentials"
+            if (atomicState.authToken) {
+	          log.debug "authToken ${atomicState.authToken} found."
+             state.myCals = getCalendarList()
+                
+              section(){
+                app(name: "childApps", appName: "GCal Search Trigger", namespace: "mnestor", title: "New Trigger...", multiple: true)
+              }
+            } else {
+            section("Restart Auth"){
+            	href "pageRestart", title: "Restart Authentication", description: "Tap to restart the authentication process, if you entered the wrong credentials."
+              }
             }
         } else {
-	        log.debug "authToken ${atomicState.authToken} found."
             section(){
                 app(name: "childApps", appName: "GCal Search Trigger", namespace: "mnestor", title: "New Trigger...", multiple: true)
             }
-            section("Options"){
-            	href "pageAbout", title: "About ${textAppName()}", description: "Tap to get application version, license, instructions or remove the application"
-            }
         }
+        section("Options"){
+            	href "pageAbout", title: "About ${textAppName()}", description: "Tap to get application version, license, instructions or remove the application"
+              }
+        
     }
 } 
 
@@ -100,7 +104,43 @@ def pageAbout() {
 	}
 }
 
+def pageRestart() {
+    atomicState.authToken = null
+    atomicState.refreshToken = null
+    atomicState.verificationUrl = null
+    atomicState.userCode = null
+    atomicState.deviceCode = null
+    app.removeSetting("gaClientID")
+    app.removeSetting("gaClientSecret")
+    
+    dynamicPage(name: "pageRestart", title: "Restart Authentication") {
+        section {
+            paragraph "Authentication process reset"
+            href "authentication", title: "Back", description: "Tap to go back to the start"
+        }
+	}
+}
 
+def pagePoll() {
+    oauthPoll()
+    if (atomicState.authToken) {
+        
+      dynamicPage(name: "pagePoll", title: "Waiting for Authentication") {
+        section {
+            paragraph "Authentication process complete!"
+            href "mainPage", title: "Home", description: "Tap to start"
+        }
+	  }
+    } else {
+        section {
+            paragraph "Still waiting for Authentication..."
+            href "pagePoll", title: "Check Authentication", description: "Tap to check again"
+        }
+        section("Restart Auth"){
+            	href "pageRestart", title: "Restart Authentication", description: "Tap to restart the authentication process, if you entered the wrong credentials."
+        }
+    }
+}
 
 def installed() {
    log.trace "Installed with settings: ${settings}"
@@ -120,17 +160,10 @@ def initialize() {
     childApps.each {child ->
         log.debug "child app: ${child.label}"
     }
-//	log.info "clientId = ${clientId}"
-//  log.info "clientSecret = ${clientSecret}"
+
 	log.info "initialize: state.refreshToken = ${state.refreshToken}"
     
     state.setup = true
-
-/**	getCalendarList()
-    
-    def cals = state.calendars
-	log.debug "Calendars are ${cals}" 	        
-**/   
 }
 
 
@@ -169,7 +202,6 @@ def getCalendarList() {
         }
     }
     
-//    def myCals = stats
     def i=1
     def calList = ""
     def calCount = stats.size()
@@ -232,79 +264,73 @@ def getNextEvents(watchCalendars, search) {
 }
 
 def oauthInitUrl() {
-	log.trace "GCalSearch: oauthInitUrl()"
-   
-	atomicState.oauthInitState = UUID.randomUUID().toString()
-	def cid = getAppClientId()
+	def postParams = [
+		uri: "https://accounts.google.com",  
+        
+		path: "/o/oauth2/device/code",		
+		requestContentType: "application/x-www-form-urlencoded; charset=utf-8",
+		body: [
+			
+			client_id: getAppClientId(),
+			scope: "https://www.googleapis.com/auth/calendar.readonly"
+		]
+	]
 
-	def oauthParams = [
-    	response_type: "code",
-      	scope: "https://www.googleapis.com/auth/calendar",
-      	client_id: cid,
-      	state: atomicState.oauthInitState,
-      	include_granted_scopes: "true",
-      	access_type: "offline",
-      	redirect_uri: "https://graph.api.smartthings.com/oauth/callback"
-   	]
+	log.debug "postParams: ${postParams}"
 
-   	redirect(location: "https://accounts.google.com/o/oauth2/v2/auth?" + toQueryString(oauthParams))
+	
+	try {
+        
+		httpPost(postParams) { resp ->
+			log.debug "resp callback"
+			log.debug resp.data
+            atomicState.deviceCode = resp.data.device_code
+            atomicState.verificationUrl = resp.data.verification_url
+            atomicState.userCode = resp.data.user_code
+		}
+        
+	} catch (e) {
+		log.error "something went wrong: $e"
+		log.error e.getResponse().getData()
+		return
+	}
 }
 
-def callback() {
-
-	log.trace "GCalSearch: callback()"
-
-	log.debug "atomicState.oauthInitState ${atomicState.oauthInitState}"
-    log.debug "params.state ${params.state}"
-    log.debug "callback() >> params: $params, params.code ${params.code}"
-
-	log.debug "token request: $params.code"
-	
+def oauthPoll() {
 	def postParams = [
 		uri: "https://www.googleapis.com",  
         
 		path: "/oauth2/v4/token",		
 		requestContentType: "application/x-www-form-urlencoded; charset=utf-8",
 		body: [
-			code: params.code,
-			client_secret: getAppClientSecret(),
+			
 			client_id: getAppClientId(),
-			grant_type: "authorization_code",
-			redirect_uri: "https://graph.api.smartthings.com/oauth/callback"
+            client_secret: getAppClientSecret(),
+			code: state.deviceCode,
+            grant_type: "http://oauth.net/grant_type/device/1.0"
 		]
 	]
 
 	log.debug "postParams: ${postParams}"
 
-	def jsonMap
+	
 	try {
 		httpPost(postParams) { resp ->
 			log.debug "resp callback"
 			log.debug resp.data
-			if (!atomicState.refreshToken && resp.data.refresh_token) {
-            	atomicState.refreshToken = resp.data.refresh_token
+            if (resp.data.error) {
+            log.error resp.data.error_description
+			displayMessageAsHtml(resp.data.error_description)
+            } else {
+                state.authToken = resp.data.access_token
+                state.refreshToken = resp.data.refresh_token
             }
-            atomicState.authToken = resp.data.access_token
-            atomicState.last_use = now()
-			jsonMap = resp.data
 		}
-        log.trace "After Callback: atomicState.refreshToken = ${atomicState.refreshToken}"
-        log.debug "After Callback: atomicState.authToken = ${atomicState.authToken}"        
-        if (!state.refreshToken && atomicState.refreshToken) {
-	        state.refreshToken = atomicState.refreshToken
-    	}    
+        
 	} catch (e) {
 		log.error "something went wrong: $e"
 		log.error e.getResponse().getData()
 		return
-	}
-
-	if (atomicState.authToken && atomicState.refreshToken ) {
-		// call some method that will render the successfully connected message
-		success()
-	} else {
-		// gracefully handle failures
-		fail()
 	}
 }
 
@@ -318,29 +344,6 @@ def isTokenExpired(whatcalled) {
 	    log.debug "authToken good"
 	    return false
     }    
-}
-
-def success() {
-
-    def message = """
-    		<p>Your account is now connected to GCal Search!</p>
-            <p>Now return to the SmartThings App and then </p>
-            <p>Click 'Done' to finish setup of GCal Search.</p>
-            <p> </p>
-            <p> authToken</p>
-            <p> ${atomicState.authToken} </p>
-            <p> refreshToken</p>            
-            <p> ${atomicState.refreshToken} </p>
-    """
-    displayMessageAsHtml(message)
-}
-
-def fail() {
-    def message = """
-        <p>There was an error authorizing GCal Search with</p>
-        <p>your Google account.  Please try again.</p>
-    """
-    displayMessageAsHtml(message)
 }
 
 def displayMessageAsHtml(message) {
@@ -377,11 +380,11 @@ private refreshAuthToken() {
         log.debug "ClientId = ${stcid}"
         def stcs = getAppClientSecret()		
         log.debug "ClientSecret = ${stcs}"
-        
+        		
         def refreshParams = [
-            method: 'POST',
+            
             uri   : "https://www.googleapis.com",
-            path  : "/oauth2/v3/token",
+            path  : "/oauth2/v4/token",
             body : [
                 refresh_token: "${refTok}", 
                 client_secret: stcs,
@@ -425,11 +428,10 @@ def getCurrentTime() {
    return d
 }
 
-def getAppClientId() { appSettings.clientId }
-def getAppClientSecret() { appSettings.clientSecret }
+def getAppClientId() { return gaClientID }
+def getAppClientSecret() { return gaClientSecret }
 
 def uninstalled() {
-	//curl https://accounts.google.com/o/oauth2/revoke?token={token}
     revokeAccess()
 }
 
@@ -474,7 +476,7 @@ private def textVersion() {
     return "${version}\n${childVersion}${deviceVersion}"
 }
 private def textCopyright() {
-    def text = "Copyright © 2017 Mike Nestor & Anthony Pastor"
+    def text = "Copyright © 2017 Mike Nestor & Anthony Pastor. Hubitat conversion by cometfish."
 }
 private def textLicense() {
 	def text =

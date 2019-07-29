@@ -6,27 +6,24 @@ Steps to set this up...
 
 1) Create a Google Project - https://console.developers.google.com and enable OAuth2 - see https://support.google.com/googleapi/answer/6158849
 
-        a) Give your project any name (perhaps "ST-GCal")
+        a) Give your project any name (perhaps "HE-GCal")
         b) Enable the Calendar API - https://console.developers.google.com/apis/library
-        c) Setup new credentials - https://console.developers.google.com/apis/credentials
-
-        d) Enable OAuth with the following redirect URI:
-                
-                https://graph.api.smartthings.com/oauth/callback 
+        c) Set up the OAuth Consent screen - https://console.developers.google.com/apis/credentials/consent 
+              i) Application Type: Internal
+              ii) Give it any name (perhaps "HE-GCal")
+              iii) Add scope `../auth/calendar.events.readonly` (if you don't see it in the list, go back to step 1b)
+        d) Create credentials - https://console.developers.google.com/apis/credentials
+              i) Type: OAuth Client ID
+              ii) Application Type: Other
+              iii) Give it any name (perhaps "HE-GCal")
                                
         e) Copy the Client ID and Client Secret from the Google credentials you just made.  Paste them in a text editor, as you will need these later
         
-2) Install the 2 SmartApps "GCal Search" and "GCal Search Trigger" via your IDE
-        (go to https://graph.api.smartthings.com/ide/app/create)
+2) Copy the code for the 2 Apps "GCal Search" and "GCal Search Trigger" into Hubitat, under Apps Code
         
-        a) Once you have installed the "GCal Search" smartapp, enable OAuth 
-        b) Put the ClientID and Client Secret you copied from Step 1 into the Settings for "GCal Search"
-        c) Publish the GCal Search (You DO NOT need to publish the GCal Search Trigger app)
-        
-3) Install and Publish the 2 DTHs: "GCal Event Sensor" and "GCal Presence Sensor"
-        (go to https://graph.api.smartthings.com/ide/device/create)
+3) Copy the code for the 2 Devices "GCal Event Sensor" and "GCal Presence Sensor" into Hubitat, under Drivers Code
 
-4) Open the ST app on your phone and install the "GCal Search" app. 
+4) In Hubitat, go to the Apps page and install the "GCal Search" app. 
         -This will walk you through connecting to Google and selecting a calendar and search terms.
         - You can create multiple connections, and based on your selection of virtual device, the app will create a virtual Contact Sensor or a virtual Presence Sensor that are Open/Present when the event starts and Close/Not Present when the event ends.
 
