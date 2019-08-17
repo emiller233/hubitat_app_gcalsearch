@@ -57,10 +57,10 @@ private version() {
 }
 
 def selectCalendars() {
-	log.trace "selectCalendars()"
+	if (parent.logEnable) log.trace "selectCalendars()"
     
     def calendars = parent.getCalendarList()
-    log.debug "Calendar list = ${calendars}"
+    if (parent.logEnable) log.debug "Calendar list = ${calendars}"
     
     //force a check to make sure the device handler is available for use
     try {
@@ -104,7 +104,7 @@ def selectCalendars() {
 }
 
 def notifications(params) {
-	log.trace "notifications()"
+	if (parent.logEnable) log.trace "notifications()"
 
 	def isSMS = false
 	if (sendSmsMsg == "Yes") { isSMS = true }
@@ -152,15 +152,15 @@ def notifications(params) {
 
 
 def nameTrigger(params) {
-	log.trace "nameTrigger()"
-	log.debug "eventOrPresence = ${eventOrPresence}"
+	if (parent.logEnable) log.trace "nameTrigger()"
+	if (parent.logEnable) log.debug "eventOrPresence = ${eventOrPresence}"
     
 	//Populate default trigger name & corresponding device name
     def defName = ""
     if (search && eventOrPresence == "Contact") {
     	defName = search - "\"" - "\"" //.replaceAll(" \" [^a-zA-Z0-9]+","")        
     }
-    log.debug "defName = ${defName}"
+    if (parent.logEnable) log.debug "defName = ${defName}"
     
 	def dName = defName
 	if ( name ) { 
@@ -187,13 +187,13 @@ def nameTrigger(params) {
 }
 
 def installed() {
-	log.trace "Installed with settings: ${settings}"
+	if (parent.logEnable) log.trace "Installed with settings: ${settings}"
     
 	initialize()    
 }
 
 def updated() {
-	log.trace "Updated with settings: ${settings}"
+	if (parent.logEnable) log.trace "Updated with settings: ${settings}"
 
 	//we have nothing to subscribe to yet
     //leave this just in case something crazy happens though
@@ -203,7 +203,7 @@ def updated() {
 }
 
 def initialize() {
-    log.trace "initialize()"
+   if (parent.logEnable)  log.trace "initialize()"
     state.installed = true
    	
     // Sets Label of Trigger
@@ -222,7 +222,7 @@ def initialize() {
 }
 
 def getDevice() {
-	log.trace "GCalSearchTrigger: getDevice()"
+	if (parent.logEnable) log.trace "GCalSearchTrigger: getDevice()"
 	def device
     if (!childCreated()) {
 	    def calName = state.calName
@@ -241,7 +241,7 @@ def getDevice() {
 }
 
 def getNextEvents() {
-    log.trace "GCalSearchTrigger: getNextEvents() child"
+   if (parent.logEnable)  log.trace "GCalSearchTrigger: getNextEvents() child"
     def search = (!settings.search) ? "" : settings.search
     return parent.getNextEvents(settings.watchCalendars, search)
 }
@@ -259,7 +259,7 @@ private getEventDeviceHandler() { return "GCal Event Sensor" }
 
 
 def refresh() {
-	log.trace "GCalSearchTrigger::refresh()"
+	if (parent.logEnable) log.trace "GCalSearchTrigger::refresh()"
 	try { unschedule(poll) } catch (e) {  }
     
     runEvery15Minutes(poll)
@@ -271,28 +271,28 @@ def poll() {
 
 private startMsg() {
     if (settings.wantStartMsgs == "Yes") {
-		log.trace "startMsg():"
+		if (parent.logEnable) log.trace "startMsg():"
     	def myApp = settings.name
     	def msgText = state.startMsg ?: "Error finding start message"
         
 		if (sendAANotification == "Yes") {
-	        log.debug( "Sending start event notification to AskAlexaMsgQueue." )        
+	       if (parent.logEnable)  log.debug( "Sending start event notification to AskAlexaMsgQueue." )        
         	sendLocationEvent(name: "AskAlexaMsgQueue", value: myApp, isStateChange: true, descriptionText: msgText, unit: myApp)  
         }    
 
 /**        if ( recipients ) {
-        	log.debug( "Sending start event to selected contacts." )
+        	if (parent.logEnable) log.debug( "Sending start event to selected contacts." )
 	        sendSms( recipients, msgText )
     	}
 **/
 
         if ( sendPushMessage != "No" ) {
-        	log.debug( "Sending start event notification via push." )
+        	if (parent.logEnable) log.debug( "Sending start event notification via push." )
 	        sendPush( msgText )
     	}
 
 	    if ( phone ) {
-    	    log.debug( "Sending start event notification via SMS." )
+    	   if (parent.logEnable)  log.debug( "Sending start event notification via SMS." )
         	sendSms( phone, msgText )
 	    }
                 
@@ -303,44 +303,44 @@ private startMsg() {
     	}
         
 	} else {
-    	log.trace "No Start Msgs"
+    	if (parent.logEnable) log.trace "No Start Msgs"
 	}    
 }
 
 private endMsg() {
     if (settings.wantEndMsgs == "Yes") {
-		log.trace "endMsg():"
+		if (parent.logEnable) log.trace "endMsg():"
     	def myApp = settings.name
     	def msgText = state.endMsg ?: "Error finding end message"
         
 		if (sendAANotification == "Yes") {
-	        log.debug( "Sending end event notification to AskAlexaMsgQueue." )
+	       if (parent.logEnable) log.debug( "Sending end event notification to AskAlexaMsgQueue." )
         	sendLocationEvent(name: "AskAlexaMsgQueue", value: myApp, isStateChange: true, descriptionText: msgText, unit: myApp)  
         }    
         
 /**        if ( recipients ) {
-        	log.debug( "Sending end event to selected contacts." )
+        	if (parent.logEnable) log.debug( "Sending end event to selected contacts." )
 	        sendSms( recipients, msgText )
     	}
 **/
         if ( sendPushMessage == "Yes" ) {
-        	log.debug( "Sending end event notification via push." )
+        	if (parent.logEnable) log.debug( "Sending end event notification via push." )
 	        sendPush( msgText )
     	}
 
 	    if ( phone ) {
-    	    log.debug( "Sending end event notification via SMS." )
+    	   if (parent.logEnable)  log.debug( "Sending end event notification via SMS." )
         	sendSms( phone, msgText )
 	    }
         
         try {
     		getDevice().offsetOff()
 	    } catch (e) {
-			log.warn "Unable to find device's offsetOff function - device is using version ${dVersion()}."        	        	
+			if (parent.logEnable) log.warn "Unable to find device's offsetOff function - device is using version ${dVersion()}."        	        	
     	}
         
     } else {    	
-        log.trace "No End Msgs"
+       if (parent.logEnable)  log.trace "No End Msgs"
 	}    
 }
 
@@ -350,7 +350,7 @@ def queueDeletionHandler() {
 }
 
 private askAlexaMsgQueueDelete() {
-	log.trace "askAlexaMsgQueueDelete():"
+	if (parent.logEnable) log.trace "askAlexaMsgQueueDelete():"
     def myApp = settings.name
     
 	sendLocationEvent(name: "AskAlexaMsgQueueDelete", value: myApp, isStateChange: true, unit: myApp)  
@@ -359,32 +359,32 @@ private askAlexaMsgQueueDelete() {
 
 def scheduleEvent(method, time, args) {
     def device = getDevice()
-   	log.trace "scheduleEvent( ${method}, ${time}, ${args} ) from ${device}." 
+   	if (parent.logEnable) log.trace "scheduleEvent( ${method}, ${time}, ${args} ) from ${device}." 
 	runOnce( time, method, args)	
 }
 
 def scheduleMsg(method, time, msg, args) {
     def device = getDevice()
     if (method == "startMsg") {
-    	log.info "Saving ${msg} as state.startMsg ."
+    	if (parent.logEnable) log.info "Saving ${msg} as state.startMsg ."
     	state.startMsg = msg
 	} else {
-    	log.info "Saving ${msg} as state.endMsg ."    
+    	if (parent.logEnable) log.info "Saving ${msg} as state.endMsg ."    
     	state.endMsg = msg
     }
-   	log.trace "scheduleMsg( ${method}, ${time}, ${args} ) from ${device}." 
+   if (parent.logEnable) log.trace "scheduleMsg( ${method}, ${time}, ${args} ) from ${device}." 
 	runOnce( time, method, args)	
 }
 
 def unscheduleEvent(method) {
-	log.trace "unscheduleEvent( ${method} )" 
+	if (parent.logEnable) log.trace "unscheduleEvent( ${method} )" 
     try { 
     	unschedule( "${method}" ) 
     } catch (e) {}       
 }
 
 def unscheduleMsg(method) {
-	log.trace "unscheduleMsg( ${method} )" 
+	if (parent.logEnable) log.trace "unscheduleMsg( ${method} )" 
     try { 
     	unschedule( "${method}" ) 
     } catch (e) {}       
@@ -398,29 +398,29 @@ def checkMsgWanted(type) {
 		if (wantEndMsgs=="Yes") {isWanted = true}
     }
     
-    log.debug "${type} Msgs Wanted? = ${isWanted}"
+   if (parent.logEnable) log.debug "${type} Msgs Wanted? = ${isWanted}"
     return isWanted    
 }
 
 def open() {
-	log.trace "${settings.name}.open():"
+	if (parent.logEnable) log.trace "${settings.name}.open():"
 	getDevice().open()
 }
 
 def close() {
-	log.trace "${settings.name}.close():"
+	if (parent.logEnable) log.trace "${settings.name}.close():"
 	getDevice().close()
 
 }
 
 def arrive() {
-	log.trace "${settings.name}.arrive():"
+	if (parent.logEnable) log.trace "${settings.name}.arrive():"
 	getDevice().arrived()
 
 }
 
 def depart() {
-	log.trace "${settings.name}.depart():"
+	if (parent.logEnable) log.trace "${settings.name}.depart():"
 	getDevice().departed()
 }
 
@@ -435,21 +435,22 @@ private uninstalled() {
 }
 
 private deleteAllChildren() {
-    log.trace "deleteAllChildren():"
+    if (parent.logEnable) log.trace "deleteAllChildren():"
     
     getChildDevices().each {
-    	log.debug "Delete $it.deviceNetworkId"
+    	if (parent.logEnable) log.debug "Delete $it.deviceNetworkId"
         try {
             deleteChildDevice(it.deviceNetworkId)
         } catch (Exception e) {
-            log.debug "Fatal exception? $e"
+            log.error "Fatal exception? $e"
         }
     }
 }
 
+
 private childCreated() {
     def isChild = getChildDevice(getDeviceID()) != null
-    log.debug "childCreated? ${isChild}"
+    if (parent.logEnable) log.debug "childCreated? ${isChild}"
     return isChild
 }
 

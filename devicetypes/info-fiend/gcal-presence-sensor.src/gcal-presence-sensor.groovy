@@ -107,7 +107,7 @@ def updated() {
 }
 
 def initialize() {
-	log.trace "GCalPresenceSensor: initialize()"
+	if (parent.logEnable) log.trace "GCalPresenceSensor: initialize()"
     refresh()
 }
 
@@ -116,17 +116,17 @@ def parse(String description) {
 }
 
 def arrived() {
-	log.trace "arrived():"
+	if (parent.logEnable) log.trace "arrived():"
 	present()
 }
 
 def present() {
-	log.trace "present()"
+	if (parent.logEnable) log.trace "present()"
     sendEvent(name: "switch", value: "on")
     sendEvent(name: 'presence', value: 'present', isStateChange: true)
     
     def departTime = new Date( device.currentState("departTime").value )	
-    log.debug "Scheduling Close for: ${departTime}"
+    if (parent.logEnable) log.debug "Scheduling Close for: ${departTime}"
     sendEvent("name":"departTime", "value":departTime)
     parent.scheduleEvent("depart", departTime, [overwrite: true])
     
@@ -138,7 +138,7 @@ def present() {
 
 // refresh status
 def refresh() {
-	log.trace "refresh()"
+	if (parent.logEnable) log.trace "refresh()"
     
     parent.refresh() // reschedule poll
     poll() // and do one now
@@ -146,12 +146,12 @@ def refresh() {
 }
 
 def departed() {
-	log.trace "departed():"
+	if (parent.logEnable) log.trace "departed():"
 	away()
 }
 
 def away() {
-	log.trace "away():"
+	if (parent.logEnable) log.trace "away():"
     
 	sendEvent(name: "switch", value: "off")
     sendEvent(name: 'presence', value: 'not present', isStateChange: true)   
@@ -163,13 +163,13 @@ def away() {
 }
 
 def poll() {
-    log.trace "poll()"
+    if (parent.logEnable) log.trace "poll()"
     def items = parent.getNextEvents()
     try {
     
 	    def currentState = device.currentValue("presence") ?: "not present"
     	def isPresent = currentState == "present"
-	    log.debug "isPresent is currently: ${isPresent}"
+	    if (parent.logEnable) log.debug "isPresent is currently: ${isPresent}"
     
         // START EVENT FOUND **********
     	if (items && items.items && items.items.size() > 0) {        
@@ -182,7 +182,7 @@ def poll() {
             	calName = event.organizer.displayName
            	}
             
-        	log.debug "We Haz Eventz! ${event}"
+        	if (parent.logEnable) log.debug "We Haz Eventz! ${event}"
 
 	        def start
     	    def end
@@ -232,22 +232,22 @@ def poll() {
       		// ALREADY IN EVENT?	        	                   
 	           // YES
         	if ( start <= new Date() ) {
-        		log.debug "Already in event ${title}."
+        		if (parent.logEnable) log.debug "Already in event ${title}."
 	        	if (!isPresent) {                     
-            		log.debug "Not Present, so arriving."                    
+            		if (parent.logEnable) log.debug "Not Present, so arriving."                    
                     open()                     
                 }   
             	
 				// NO                
 	        } else {
-            	log.debug "Event ${title} still in future."
+            	if (parent.logEnable) log.debug "Event ${title} still in future."
                 
                 if (isPresent) { 
-	                log.debug "Presence incorrect, so departing."	                
+	                if (parent.logEnable) og.debug "Presence incorrect, so departing."	                
     	            departed()                                         
               	}
                     
-                log.debug "SCHEDULING ARRIVAL: parent.scheduleEvent(arrive, ${start}, '[overwrite: true]' )."
+                if (parent.logEnable) log.debug "SCHEDULING ARRIVAL: parent.scheduleEvent(arrive, ${start}, '[overwrite: true]' )."
         		parent.scheduleEvent("arrive", start, [overwrite: true])
                 
 			}           
@@ -256,13 +256,13 @@ def poll() {
 
         // START NO EVENT FOUND ******
     	} else {
-        	log.trace "No events - set all atributes to null."
+        	if (parent.logEnable) log.trace "No events - set all atributes to null."
 	    	
             sendEvent("name":"eventSummary", "value":"No events found", isStateChange: true)
             
 	    	if (isPresent) { 
             	   
-                log.debug "Presence incorrect, so departing."
+                if (parent.logEnable) log.debug "Presence incorrect, so departing."
                 departed()                                          
             } else { 
 				parent.unscheduleEvent("open")   
@@ -271,7 +271,7 @@ def poll() {
         // END NO EVENT FOUND
         
     } catch (e) {
-    	log.warn "Failed to do poll: ${e}"
+    	log.error "Failed to do poll: ${e}"
     }
 }
 

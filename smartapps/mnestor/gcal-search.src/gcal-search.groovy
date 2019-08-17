@@ -38,12 +38,12 @@ private version() {
 }
 
 def mainPage() {
-	log.info "atomicState.refreshToken = ${atomicState.refreshToken}"
+	if (logEnable) log.info "atomicState.refreshToken = ${atomicState.refreshToken}"
 
     return dynamicPage(name: "authentication", uninstall: false) {
         if (!atomicState.authToken) {
-	        log.debug "No authToken found."
-            log.debug gaClientID
+	        if (logEnable) log.debug "No authToken found."
+            if (logEnable) log.debug gaClientID
             if (!gaClientID || !gaClientSecret) {
                 section("Google Authentication"){
                     paragraph "Enter your Google API credentials below"
@@ -68,16 +68,16 @@ def mainPage() {
             }
             
             if (atomicState.authToken) {
-	          log.debug "authToken ${atomicState.authToken} found."
-             state.myCals = getCalendarList()
+	            if (logEnable) log.debug "authToken ${atomicState.authToken} found."
+                state.myCals = getCalendarList()
                 
-              section(){
-                app(name: "childApps", appName: "GCal Search Trigger", namespace: "mnestor", title: "New Trigger...", multiple: true)
-              }
+                section(){
+                    app(name: "childApps", appName: "GCal Search Trigger", namespace: "mnestor", title: "New Trigger...", multiple: true)
+                }
             } else {
-            section("Restart Auth"){
-            	href "pageRestart", title: "Restart Authentication", description: "Tap to restart the authentication process, if you entered the wrong credentials."
-              }
+                section("Restart Auth"){
+                    href "pageRestart", title: "Restart Authentication", description: "Tap to restart the authentication process, if you entered the wrong credentials."
+                }
             }
         } else {
             section(){
@@ -85,8 +85,9 @@ def mainPage() {
             }
         }
         section("Options"){
-            	href "pageAbout", title: "About ${textAppName()}", description: "Tap to get application version, license, instructions or remove the application"
-              }
+            input "logEnable", "bool", title:"Enable debug logging", defaultValue: true
+            href "pageAbout", title: "About ${textAppName()}", description: "Tap to get application version, license, instructions or remove the application"
+        }
         
     }
 } 
@@ -156,20 +157,21 @@ def updated() {
 def initialize() {
     log.trace "GCalSearch: initialize()"
 
-    log.debug "There are ${childApps.size()} GCal Search Triggers"
-    childApps.each {child ->
-        log.debug "child app: ${child.label}"
-    }
+    if (logEnable) {
+        log.debug "There are ${childApps.size()} GCal Search Triggers"
+        childApps.each {child ->
+            log.debug "child app: ${child.label}"
+        }
 
-	log.info "initialize: state.refreshToken = ${state.refreshToken}"
-    
+        log.info "initialize: state.refreshToken = ${state.refreshToken}"
+    } 
     state.setup = true
 }
 
 
 
 def getCalendarList() {
-    log.trace "getCalendarList()"
+    if (logEnable) log.trace "getCalendarList()"
     isTokenExpired("getCalendarList")    
     
     def path = "/calendar/v3/users/me/calendarList"
@@ -180,7 +182,7 @@ def getCalendarList() {
         query: [format: 'json', body: requestBody]
     ]
 
-    log.debug "calendar params: $calendarListParams"
+    if (logEnable) log.debug "calendar params: $calendarListParams"
 	
     def stats = [:]
 
@@ -192,33 +194,35 @@ def getCalendarList() {
             
         }
     } catch (e) {
-        log.debug "error: ${path}"
-        log.debug e
+        log.error "error: ${path}"
+        log.error e
         if (refreshAuthToken()) {
             return getCalendarList()
         } else {
-            log.debug "fatality"
+            log.error "fatality"
             log.error e.getResponse().getData()
         }
     }
     
-    def i=1
-    def calList = ""
-    def calCount = stats.size()
-    calList = calList + "\nYou have ${calCount} available Gcal calendars (Calendar Name - calendarId): \n\n"
-    stats.each {
-     	calList = calList + "(${i})  ${it.value} - ${it.key} \n"
-        i = i+1
-	}
-           
-    log.info calList
+    if (logEnable) {
+        def i=1
+        def calList = ""
+        def calCount = stats.size()
+        calList = calList + "\nYou have ${calCount} available Gcal calendars (Calendar Name - calendarId): \n\n"
+        stats.each {
+        calList = calList + "(${i})  ${it.value} - ${it.key} \n"
+            i = i+1
+        }
+        
+        log.info calList
+    }
     
     state.calendars = stats
     return stats
 }
 
 def getNextEvents(watchCalendars, search) {
-    log.trace "getNextEvents()"
+    if (logEnable) log.trace "getNextEvents()"
     isTokenExpired("getNextEvents")    
     
     def pathParams = [
@@ -230,7 +234,7 @@ def getNextEvents(watchCalendars, search) {
     if (search != "") {
         pathParams['q'] = "${search}"
     }
-    log.debug "pathParams: ${pathParams}"
+    if (logEnable) log.debug "pathParams: ${pathParams}"
    
     def path = "/calendar/v3/calendars/${watchCalendars}/events"
     def eventListParams = [
@@ -240,7 +244,7 @@ def getNextEvents(watchCalendars, search) {
         query: pathParams
     ]
 
-    log.debug "event params: $eventListParams"
+    if (logEnable) log.debug "event params: $eventListParams"
 
     def evs = []
     try {
@@ -248,18 +252,18 @@ def getNextEvents(watchCalendars, search) {
             evs = resp.data
         }
     } catch (e) {
-        log.debug "error: ${path}"
-        log.debug e
+        log.error "error: ${path}"
+        log.error e
         log.error e.getResponse().getData()
         if (refreshAuthToken()) {
             return getNextEvents(watchCalendars, search)
         } else {
-            log.debug "fatality"
+            log.error "fatality"
             log.error e.getResponse().getData()
         }
     }
     
-   log.debug evs
+   if (logEnable) log.debug evs
    return evs
 }
 
@@ -276,14 +280,16 @@ def oauthInitUrl() {
 		]
 	]
 
-	log.debug "postParams: ${postParams}"
+	if (logEnable) log.debug "postParams: ${postParams}"
 
 	
 	try {
         
 		httpPost(postParams) { resp ->
-			log.debug "resp callback"
-			log.debug resp.data
+            if (logEnable) {
+                log.debug "resp callback"
+                log.debug resp.data
+            }
             atomicState.deviceCode = resp.data.device_code
             atomicState.verificationUrl = resp.data.verification_url
             atomicState.userCode = resp.data.user_code
@@ -311,13 +317,15 @@ def oauthPoll() {
 		]
 	]
 
-	log.debug "postParams: ${postParams}"
+	if (logEnable) log.debug "postParams: ${postParams}"
 
 	
 	try {
 		httpPost(postParams) { resp ->
-			log.debug "resp callback"
-			log.debug resp.data
+            if (logEnable) {
+                log.debug "resp callback"
+                log.debug resp.data
+            } 
             if (resp.data.error) {
             log.error resp.data.error_description
 			displayMessageAsHtml(resp.data.error_description)
@@ -335,13 +343,13 @@ def oauthPoll() {
 }
 
 def isTokenExpired(whatcalled) {
-    log.trace "isTokenExpired() called by ${whatcalled}"
+    if (logEnable) log.trace "isTokenExpired() called by ${whatcalled}"
     
     if (atomicState.last_use == null || now() - atomicState.last_use > 3000) {
-    	log.debug "authToken null or old (>3000) - calling refreshAuthToken()"
+    	if (logEnable) log.debug "authToken null or old (>3000) - calling refreshAuthToken()"
         return refreshAuthToken()
     } else {
-	    log.debug "authToken good"
+	    if (logEnable) log.debug "authToken good"
 	    return false
     }    
 }
@@ -363,7 +371,7 @@ def displayMessageAsHtml(message) {
 }
 
 private refreshAuthToken() {
-    log.trace "GCalSearch: refreshAuthToken()"
+    if (logEnable)  log.trace "GCalSearch: refreshAuthToken()"
     if(!atomicState.refreshToken && !state.refreshToken) {    
         log.warn "Can not refresh OAuth token since there is no refreshToken stored"
         log.debug state
@@ -371,15 +379,15 @@ private refreshAuthToken() {
     	def refTok 
    	    if (state.refreshToken) {
         	refTok = state.refreshToken
-    		log.debug "Existing state.refreshToken = ${refTok}"
+    		if (logEnable) log.debug "Existing state.refreshToken = ${refTok}"
         } else if ( atomicState.refreshToken ) {        
         	refTok = atomicState.refreshToken
-    		log.debug "Existing atomicState.refreshToken = ${refTok}"
+    		if (logEnable) log.debug "Existing atomicState.refreshToken = ${refTok}"
         }    
         def stcid = getAppClientId()		
-        log.debug "ClientId = ${stcid}"
+        if (logEnable) log.debug "ClientId = ${stcid}"
         def stcs = getAppClientSecret()		
-        log.debug "ClientSecret = ${stcs}"
+        if (logEnable) log.debug "ClientSecret = ${stcs}"
         		
         def refreshParams = [
             
@@ -393,15 +401,15 @@ private refreshAuthToken() {
             ],
         ]
 
-        log.debug refreshParams
+        if (logEnable) log.debug refreshParams
 
         //changed to httpPost
         try {
             httpPost(refreshParams) { resp ->
-                log.debug "Token refreshed...calling saved RestAction now!"
+                if (logEnable) log.debug "Token refreshed...calling saved RestAction now!"
 
                 if(resp.data) {
-                    log.debug resp.data
+                    if (logEnable) log.debug resp.data
                     atomicState.authToken = resp?.data?.access_token
 					atomicState.last_use = now()
                     
@@ -410,7 +418,7 @@ private refreshAuthToken() {
             }
         }
         catch(Exception e) {
-            log.debug "caught exception refreshing auth token: " + e
+            log.error "caught exception refreshing auth token: " + e
             log.error e.getResponse().getData()
         }
     }
@@ -441,7 +449,7 @@ def childUninstalled() {
 
 def revokeAccess() {
 
-    log.trace "GCalSearch: revokeAccess()"
+    if (logEnable) log.trace "GCalSearch: revokeAccess()"
 
 	refreshAuthToken()
 	
@@ -451,16 +459,18 @@ def revokeAccess() {
     
 	try {
     	def uri = "https://accounts.google.com/o/oauth2/revoke?token=${atomicState.authToken}"
-        log.debug "Revoke: ${uri}"
+        if (logEnable) log.debug "Revoke: ${uri}"
 		httpGet(uri) { resp ->
-			log.debug "resp"
-			log.debug resp.data
+            if (logEnable) {
+                log.debug "resp"
+                log.debug resp.data
+            }
     		revokeAccessToken()
             atomicState.accessToken = atomicState.refreshToken = atomicState.authToken = state.refreshToken = null
 		}
 	} catch (e) {
-		log.debug "something went wrong: $e"
-		log.debug e.getResponse().getData()
+		log.error "something went wrong: $e"
+		log.error e.getResponse().getData()
 	}
 }
 

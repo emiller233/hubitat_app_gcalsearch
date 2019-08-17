@@ -1,6 +1,5 @@
 /**
  *  Copyright 2017 Mike Nestor & Anthony Pastor
- *  Hubitat conversion by cometfish.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -203,7 +202,7 @@ def parse(String description) {
 
 // refresh status
 def refresh() {
-	log.trace "GCalEventSensor: refresh()"
+	if (parent.logEnable) log.trace "GCalEventSensor: refresh()"
     
     parent.refresh() // reschedule poll
     poll() // and do one now
@@ -211,33 +210,33 @@ def refresh() {
 }
 
 def open() {
-	log.trace "GCalEventSensor: open()"
+	if (parent.logEnable) log.trace "GCalEventSensor: open()"
         
     sendEvent(name: "switch", value: "on")
 	sendEvent(name: "contact", value: "open", isStateChange: true)
 
 /**	//Schedule Close 
     def closeTime = device.currentValue("closeTime")	
-    log.debug "Device's closeTime = ${closeTime}"
+    if (parent.logEnable) log.debug "Device's closeTime = ${closeTime}"
     
-	log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${closeTime}, '[overwrite: true]' )."
+	if (parent.logEnable) log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${closeTime}, '[overwrite: true]' )."
     parent.scheduleEvent("close", closeTime, [overwrite: true])
 
 
     //Schedule endMsg
     def endMsgTime = device.currentValue("endMsgTime")	   
-	log.debug "Device's endMsgTime = ${endMsgTime}"
+	if (parent.logEnable) log.debug "Device's endMsgTime = ${endMsgTime}"
 	def endMsg = device.currentValue("endMsg") ?: "No End Message"
-    log.debug "Device's endMsg = ${endMsg}"
+    if (parent.logEnable) log.debug "Device's endMsg = ${endMsg}"
 
-    log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
+    if (parent.logEnable) log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
     parent.scheduleMsg("endMsg", endMsgTime, endMsg, [overwrite: true])
 **/    
 }
 
 
 def close() {
-	log.trace "GCalEventSensor: close()"
+	if (parent.logEnable) log.trace "GCalEventSensor: close()"
     
     sendEvent(name: "switch", value: "off")
     sendEvent(name: "offsetNotify", value: "off")
@@ -246,32 +245,32 @@ def close() {
 }
 
 def offsetOn() {
-	log.trace "GCalEventSensor: offsetOn()"
+	if (parent.logEnable) log.trace "GCalEventSensor: offsetOn()"
     
     sendEvent(name: "offsetNotify", value: "on", isStateChange: true)           
     
 }
 
 def offsetOff() {
-	log.trace "GCalEventSensor: offsetOff()"
+	if (parent.logEnable) log.trace "GCalEventSensor: offsetOff()"
     
     sendEvent(name: "offsetNotify", value: "off", isStateChange: true)           
     
 }
 
 void poll() {
-    log.trace "poll()"
+    if (parent.logEnable) log.trace "poll()"
     def items = parent.getNextEvents()
     try {	                 
             
 	    def currentState = device.currentValue("contact") ?: "closed"
     	def isOpen = currentState == "open"
-//	    log.debug "isOpen is currently: ${isOpen}"
+//	    if (parent.logEnable) log.debug "isOpen is currently: ${isOpen}"
     
         // EVENT FOUND **********
     	if (items && items.items && items.items.size() > 0) {        
 
-        	log.debug "GCalEventSensor: We Haz Eventz!"
+        	if (parent.logEnable) log.debug "GCalEventSensor: We Haz Eventz!"
             
 			//	Only process the next scheduled event             
             def event = items.items[0]
@@ -296,6 +295,7 @@ void poll() {
                 sendEvent("name":"location", "value":" ", displayed: false)
             }
             
+            
 			// Get event start and end times
 	        def startTime
     	    def endTime
@@ -315,16 +315,16 @@ void poll() {
                 startTime = sdf.parse(event.start.dateTime)
         	    endTime = sdf.parse(event.end.dateTime)
             }   						
-            log.debug "From GCal: startTime = ${startTime} & endTime = ${endTime}"
-//            log.debug "old power = ${device.currentValue("power")}"
+            if (parent.logEnable) log.debug "From GCal: startTime = ${startTime} & endTime = ${endTime}"
+//            if (parent.logEnable) log.debug "old power = ${device.currentValue("power")}"
             // Toggles power attribute when new event is detected
             if (startTime != device.currentValue("eventTime") ) {
 	            if (device.currentValue("power") == 0 ) {
     	        	sendEvent(name: "power", value: "1", isStateChange: true)
-//		            log.debug "new power = ${device.currentValue("power")}"			        	    
+//		            if (parent.logEnable) log.debug "new power = ${device.currentValue("power")}"			        	    
                 } else {
             		sendEvent(name: "power", value: "0", displayed: true, isStateChange: true)
-//		            log.debug "new power = ${device.currentValue("power")}"			
+//		            if (parent.logEnable) log.debug "new power = ${device.currentValue("power")}"			
                 }
             }            
 
@@ -341,7 +341,7 @@ void poll() {
                 
        		    if (startOffset !=0) { 
 		            startMsgTime = msgTimeOffset(startOffset, startMsgTime)
-					log.debug "startOffset: ${startOffset} / startMsgTime = ${startMsgTime}"
+					if (parent.logEnable) log.debug "startOffset: ${startOffset} / startMsgTime = ${startMsgTime}"
 				}            
             }
             
@@ -354,10 +354,10 @@ void poll() {
                 }  
        	    	if (endOffset !=0) { 
 	        	    endMsgTime = msgTimeOffset(endOffset, endMsgTime)
-		            log.debug "endOffset: ${endOffset} / endMsgTime = ${endMsgTime}}"                        
+		            if (parent.logEnable) log.debug "endOffset: ${endOffset} / endMsgTime = ${endMsgTime}}"                        
                 }               
 			}
-            log.debug "startMsgTime = ${startMsgTime} / endMsgTime = ${endMsgTime}"
+            if (parent.logEnable) log.debug "startMsgTime = ${startMsgTime} / endMsgTime = ${endMsgTime}"
             
 			// Build Event Summary
 	        def eventSummary = "Next GCal Event: ${title}\n\n"
@@ -405,28 +405,28 @@ void poll() {
 			sendEvent("name":"startMsg", "value":"${startMsg}", displayed: false, isStateChange: true)
             
        //     def eventTest = new Date()
-            log.debug "eventTest = ${eventTest}"
+            if (parent.logEnable) log.debug "eventTest = ${eventTest}"
       		// ALREADY IN EVENT?	        	                   
 	           // YES
         	if ( startTime <= new Date() ) {
-//				log.debug "startTime ${startTime} should be before eventTest = ${eventTest}"
+//				if (parent.logEnable) log.debug "startTime ${startTime} should be before eventTest = ${eventTest}"
             	if ( new Date() < endTime ) {
-	        		log.debug "Currently within ${type}vent ${title}."
+	        		if (parent.logEnable) log.debug "Currently within ${type}vent ${title}."
 		        	if (!isOpen) {                     
-        	    		log.debug "Contact currently closed, so opening."                    
+        	    		if (parent.logEnable) log.debug "Contact currently closed, so opening."                    
             	        open()
                         
                         //Schedule Close & end event messaging
-						log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${endTime}, '[overwrite: true]' )."
+						if (parent.logEnable) log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${endTime}, '[overwrite: true]' )."
 					    parent.scheduleEvent("close", endTime, [overwrite: true])
-					    log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
+					    if (parent.logEnable) log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
 					    parent.scheduleMsg("endMsg", endMsgTime, endMsg, [overwrite: true]) 
                 	}
 				} else {
-	                log.debug "Already past start of ${type}vent ${title}."
+	                if (parent.logEnable) log.debug "Already past start of ${type}vent ${title}."
                     
 		        	if (isOpen) {                     
-        	    		log.debug "Contact incorrectly open, so close."                    
+        	    		if (parent.logEnable) log.debug "Contact incorrectly open, so close."                    
             	        close()
                         offsetOff()
 						
@@ -440,23 +440,23 @@ void poll() {
                 }    
                 // NO                        
 	        } else {
-            	log.debug "${type}vent ${title} still in future."
+            	if (parent.logEnable) log.debug "${type}vent ${title} still in future."
 	        	if (isOpen) { 				
-                    log.debug "Contact incorrectly open, so close."
+                    if (parent.logEnable) log.debug "Contact incorrectly open, so close."
                     close()
                     offsetOff()
 				}                 
 	            
                 // Schedule Open & start event messaging
-                log.debug "SCHEDULING OPEN: parent.scheduleEvent(open, ${startTime}, '[overwrite: true]' )."
+                if (parent.logEnable) log.debug "SCHEDULING OPEN: parent.scheduleEvent(open, ${startTime}, '[overwrite: true]' )."
         		parent.scheduleEvent("open", startTime, [overwrite: true])
-				log.debug "SCHEDULING STARTMSG: parent.scheduleMsg(startMsg, ${startMsgTime}, ${startMsg}, '[overwrite: true]' )."
+				if (parent.logEnable) log.debug "SCHEDULING STARTMSG: parent.scheduleMsg(startMsg, ${startMsgTime}, ${startMsg}, '[overwrite: true]' )."
                 parent.scheduleMsg("startMsg", startMsgTime, startMsg, [overwrite: true])
 
 				//Schedule Close & end event messaging
-				log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${endTime}, '[overwrite: true]' )."
+				if (parent.logEnable) log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${endTime}, '[overwrite: true]' )."
 			    parent.scheduleEvent("close", endTime, [overwrite: true])
-			    log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
+			    if (parent.logEnable) log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
 			    parent.scheduleMsg("endMsg", endMsgTime, endMsg, [overwrite: true])                
         	
             }
@@ -466,12 +466,12 @@ void poll() {
 
         // START NO EVENT FOUND ******
     	} else {
-        	log.trace "No events - set all attributes to null."
+        	if (parent.logEnable) log.trace "No events - set all attributes to null."
 
 	    	sendEvent("name":"eventSummary", "value":"No events found", isStateChange: true)
             
 	    	if (isOpen) {             	
-                log.debug "Contact incorrectly open, so close."
+                if (parent.logEnable) log.debug "Contact incorrectly open, so close."
                 close()
                 offsetOff()
     	    } else {
@@ -485,18 +485,18 @@ void poll() {
         // END NO EVENT FOUND
             
     } catch (e) {
-    	log.warn "Failed to do poll: ${e}"
+    	log.error "Failed to do poll: ${e}"
     }
 }
  
 private Date msgTimeOffset(int minutes, Date originalTime){
-   log.trace "Gcal Event Sensor: msgTimeOffset()"
+   if (parent.logEnable) log.trace "Gcal Event Sensor: msgTimeOffset()"
    final long ONE_MINUTE_IN_MILLISECONDS = 60000;
 
    long currentTimeInMs = originalTime.getTime()
    Date offsetTime = new Date(currentTimeInMs + (minutes * ONE_MINUTE_IN_MILLISECONDS))
    
-   log.trace "offsetTime = ${offsetTime}"
+   if (parent.logEnable) log.trace "offsetTime = ${offsetTime}"
    return offsetTime
 }
 
@@ -608,7 +608,7 @@ def getMapHTML() {
 def childSummary() {
 	def theSum 
     theSum = device.currentValue("eventSummary") ?: "There is no event."
-	log.debug "sending summary of ${theSum}"
+	if (parent.logEnable) log.debug "sending summary of ${theSum}"
 	return "${theSum}"
 }    
 
@@ -616,7 +616,7 @@ def childLocation() {
 	def theLoc
     theLoc = device.currentValue("location") 
 //    replace (theLoc, " ", "+")
-	log.debug "sending location of ${theLoc}"
+	if (parent.logEnable) log.debug "sending location of ${theLoc}"
 	return "${theLoc}"
 }    
 
