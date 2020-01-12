@@ -57,12 +57,8 @@ metadata {
 
 		command "open"
 		command "close"
-        command "offsetOn"
-        command "offsetOff"
         command "childSummary"
         command "childLocation"
-        command "setStartoffset"
-        command "setEndoffset"
         
         
         attribute "calendar", "json_object"
@@ -70,115 +66,19 @@ metadata {
         attribute "name", "string"
         attribute "eventSummary", "string"
         attribute "openTime", "number"
-        attribute "closeTime", "number"				        
-        attribute "startMsgTime", "number"
-        attribute "endMsgTime", "number"
-        attribute "startMsg", "string"
-        attribute "endMsg", "string"
-        attribute "offsetNotify", "string"
+        attribute "closeTime", "number"
         attribute "deleteInfo", "string"
         attribute "location", "string"
         attribute "locationForURL", "string"
         attribute "eventTime", "string"
         attribute "eventTitle", "string"
-        attribute "startOffset", "number"
-        attribute "endOffset", "number"
-	}
-
-	simulator {
-		status "open": "contact:open"
-		status "closed": "contact:closed"
-	}
-
-	tiles (scale: 2) {
-		standardTile("status", "device.contact", width: 2, height: 2) {
-			state("closed", label:'', icon:"https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal-Off@2x.png", backgroundColor:"#ffffff")
-			state("open", label:'', icon:"https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal-On@2x.png", backgroundColor:"#79b821")
-		}
-
-        //Open & Close Button Tiles	(not used)
-        standardTile("closeBtn", "device.fake", width: 3, height: 2, decoration: "flat") {
-			state("default", label:'CLOSE', backgroundColor:"#CCCC00", action:"close")
-		}
-		standardTile("openBtn", "device.fake", width: 3, height: 2, decoration: "flat") {
-			state("default", label:'OPEN', backgroundColor:"#53a7c0", action:"open")
-		}
-        
-        //Refresh        
-        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width:4, height: 2) {
-            state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
-        }
-
-        //Event Summary
-        valueTile("summary", "device.eventSummary", inactiveLabel: false, decoration: "flat", width: 6, height: 6) {
-            state "default", label:'${currentValue}'
-        }
-        
-        //Event Info (not used)        
-        valueTile("calendar", "device.calendar", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'${currentValue}'
-        }
-        valueTile("calName", "device.calName", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'${currentValue}'
-        }
-        valueTile("name", "device.name", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'${currentValue}'
-        }
-        valueTile("location", "device.location", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'${currentValue}'
-        }
-        
-        //Not used
-        valueTile("startMsg", "device.startMsg", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'startMsg:\n ${currentValue}'
-        }
-        valueTile("startMsgTime", "device.startMsgTime", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'startMsgTime:\n ${currentValue}'
-        }
-        valueTile("endMsg", "device.endMsg", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'endMsg:\n ${currentValue}'
-        }
-        valueTile("endMsgTime", "device.endMsgTime", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'endMsgTime:\n ${currentValue}'
-        }
-        valueTile("offsetNotify", "device.offsetNotify", inactiveLabel: false, decoration: "flat", width: 3, height: 2) {
-            state "off", label:'offsetNot: ${currentValue}', backgroundColor:"#ffffff"
-            state "on", label:'offsetNot: ${currentValue}', backgroundColor:"#79b821"
-        }
-        valueTile("deleteInfo", "device.deleteInfo", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'To remove this device from ST - delete the corresponding GCal Search Trigger.'
-        }
-        valueTile("eventTime", "device.eventTime", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'eventTime:\n ${currentValue}'
-        }
-        valueTile("eventTitle", "device.eventTitle", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'${currentValue}'
-        }
-        /*
-        htmlTile(name:"mapHTML",
-				action: "getMapHTML",
-				refreshInterval: 1,
-				width: 6,
-				height: 12,
-				whitelist: ["www.google.com", "maps.googleapis.com"]
-        )
-        */
-		main "status"
-		details(["eventTitle", "summary", "status", "refresh", "deleteInfo"])	
-        			//"closeBtn", "openBtn",  , "startMsgTime", "startMsg", "endMsgTime", "endMsg", , "offsetNotify", "eventTime", "mapHTML",
 	}
 }
-/*
-mappings {
-	path("/getMapHTML") {action: [GET: "getMapHTML"]}
-}*/
 
 def installed() {
     log.trace "GCalEventSensor: installed()"
- //   sendEvent(name: "DeviceWatch-Enroll", value: "{\"protocol\": \"LAN\", \"scheme\":\"untracked\"}")
     
     sendEvent(name: "switch", value: "off")
-    sendEvent(name: "offsetNotify", value: "off")
     sendEvent(name: "contact", value: "closed", isStateChange: true)
     
     initialize()
@@ -214,48 +114,13 @@ def open() {
         
     sendEvent(name: "switch", value: "on")
 	sendEvent(name: "contact", value: "open", isStateChange: true)
-
-/**	//Schedule Close 
-    def closeTime = device.currentValue("closeTime")	
-    if (parent.logEnable) log.debug "Device's closeTime = ${closeTime}"
-    
-	if (parent.logEnable) log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${closeTime}, '[overwrite: true]' )."
-    parent.scheduleEvent("close", closeTime, [overwrite: true])
-
-
-    //Schedule endMsg
-    def endMsgTime = device.currentValue("endMsgTime")	   
-	if (parent.logEnable) log.debug "Device's endMsgTime = ${endMsgTime}"
-	def endMsg = device.currentValue("endMsg") ?: "No End Message"
-    if (parent.logEnable) log.debug "Device's endMsg = ${endMsg}"
-
-    if (parent.logEnable) log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
-    parent.scheduleMsg("endMsg", endMsgTime, endMsg, [overwrite: true])
-**/    
 }
-
 
 def close() {
 	if (parent.logEnable) log.trace "GCalEventSensor: close()"
     
     sendEvent(name: "switch", value: "off")
-    sendEvent(name: "offsetNotify", value: "off")
-    sendEvent(name: "contact", value: "closed", isStateChange: true)           
-    
-}
-
-def offsetOn() {
-	if (parent.logEnable) log.trace "GCalEventSensor: offsetOn()"
-    
-    sendEvent(name: "offsetNotify", value: "on", isStateChange: true)           
-    
-}
-
-def offsetOff() {
-	if (parent.logEnable) log.trace "GCalEventSensor: offsetOff()"
-    
-    sendEvent(name: "offsetNotify", value: "off", isStateChange: true)           
-    
+    sendEvent(name: "contact", value: "closed", isStateChange: true)
 }
 
 void poll() {
@@ -329,36 +194,7 @@ void poll() {
             }            
 
             sendEvent("name":"eventTime", "value":startTime, displayed: false, isStateChange: true)
-                        
-			// Build Notification Times & Messages
-            def startMsgWanted = parent.checkMsgWanted("startMsg")
-			def startMsgTime = startTime
-			if (startMsgWanted) {
-				def startOffset = parent.getStartOffset() ?:0            
-				if ( device.currentValue("startOffset") > 0 ) { 
-                	startOffset = device.currentValue("startOffset")
-                }  
                 
-       		    if (startOffset !=0) { 
-		            startMsgTime = msgTimeOffset(startOffset, startMsgTime)
-					if (parent.logEnable) log.debug "startOffset: ${startOffset} / startMsgTime = ${startMsgTime}"
-				}            
-            }
-            
-            def endMsgWanted = parent.checkMsgWanted("endMsg")
-           	def endMsgTime = endTime                      
-            if (endMsgWanted) {
-				def endOffset = parent.getEndOffset() ?:0            
-				if ( device.currentValue("endOffset") > 0 ) { 
-                	endOffset = device.currentValue("endOffset")
-                }  
-       	    	if (endOffset !=0) { 
-	        	    endMsgTime = msgTimeOffset(endOffset, endMsgTime)
-		            if (parent.logEnable) log.debug "endOffset: ${endOffset} / endMsgTime = ${endMsgTime}}"                        
-                }               
-			}
-            if (parent.logEnable) log.debug "startMsgTime = ${startMsgTime} / endMsgTime = ${endMsgTime}"
-            
 			// Build Event Summary
 	        def eventSummary = "Next GCal Event: ${title}\n\n"
 			eventSummary += "Calendar: ${calName}\n\n" 
@@ -367,42 +203,16 @@ void poll() {
     	    def startTimeHuman = startTime.format("EEE, MMM dd hh:mm a", location.timeZone)
         	eventSummary += "Event Start: ${startTimeHuman}\n"
 	        
-            def startMsg = "No Start Msg Wanted"
-            if (startMsgWanted) {
-            	def sPart = "s"
-            	if (startOffset > 0) { sPart = "ed" }            
-	            def startMsgTimeHuman = startMsgTime.format("hh:mm a", location.timeZone)            
-                startMsg = "${type}vent ${title} occur" + "${sPart} at " + startTimeHuman                 
-				eventSummary += "Start Notfication at ${startMsgTimeHuman}.\n\n"
-	        }
-            
 	        def endTimeHuman = endTime.format("EEE, MMM dd hh:mm a", location.timeZone)
     	    eventSummary += "Event End: ${endTimeHuman}\n"
 
-            def endMsg = "No End Msg Wanted"
-			if (endMsgWanted) {
-            	def ePart = "s"
-            	if (endOffset > 0) { ePart = "ed" }
-		        def endMsgTimeHuman = endMsgTime.format("hh:mm a", location.timeZone)            
-	            endMsg = "${type}vent ${title} occur" + "${ePart} at " + endTimeHuman                
-				eventSummary += "End Notfication at ${endMsgTimeHuman}.\n\n"
-        	}
-            
-//            if (event.description) {
-//	            eventSummary += event.description ? event.description : ""
-//    		}
        	    sendEvent("name":"eventSummary", "value":eventSummary)
 			
-            
-            // Then set the closeTime, endMsgTime, and endMsg before opening an event in progress
-            sendEvent("name":"closeTime", "value":endTime, displayed: false)           
-			sendEvent("name":"endMsgTime", "value":endMsgTime, displayed: false)
-            sendEvent("name":"endMsg", "value":"${endMsg}", displayed: false)                        
+            // Then set the closeTime before opening an event in progress
+            sendEvent("name":"closeTime", "value":endTime, displayed: false)
 
-			// Then set the openTime, startMsgTime, and startMsg 
+			// Then set the openTime
 			sendEvent("name":"openTime", "value":startTime, displayed: false)
-			sendEvent("name":"startMsgTime", "value":startMsgTime, displayed: false)            
-			sendEvent("name":"startMsg", "value":"${startMsg}", displayed: false, isStateChange: true)
             
        //     def eventTest = new Date()
             if (parent.logEnable) log.debug "eventTest = ${eventTest}"
@@ -431,10 +241,8 @@ void poll() {
                         offsetOff()
 						
                         // Unschedule All
-						parent.unscheduleEvent("open")                    
-        		        parent.unscheduleMsg("startMsg") 
-		                parent.unscheduleEvent("close")  
-        		        parent.unscheduleMsg("endMsg")   
+						parent.unscheduleEvent("open")
+		                parent.unscheduleEvent("close")
 
                 	}
                 }    
@@ -450,14 +258,10 @@ void poll() {
                 // Schedule Open & start event messaging
                 if (parent.logEnable) log.debug "SCHEDULING OPEN: parent.scheduleEvent(open, ${startTime}, '[overwrite: true]' )."
         		parent.scheduleEvent("open", startTime, [overwrite: true])
-				if (parent.logEnable) log.debug "SCHEDULING STARTMSG: parent.scheduleMsg(startMsg, ${startMsgTime}, ${startMsg}, '[overwrite: true]' )."
-                parent.scheduleMsg("startMsg", startMsgTime, startMsg, [overwrite: true])
 
 				//Schedule Close & end event messaging
 				if (parent.logEnable) log.debug "SCHEDULING CLOSE: parent.scheduleEvent: (close, ${endTime}, '[overwrite: true]' )."
-			    parent.scheduleEvent("close", endTime, [overwrite: true])
-			    if (parent.logEnable) log.debug "SCHEDULING ENDMSG: parent.scheduleMsg(endMsg, ${endMsgTime}, ${endMsg}, '[overwrite: true]' )."
-			    parent.scheduleMsg("endMsg", endMsgTime, endMsg, [overwrite: true])                
+			    parent.scheduleEvent("close", endTime, [overwrite: true])            
         	
             }
             
@@ -473,13 +277,10 @@ void poll() {
 	    	if (isOpen) {             	
                 if (parent.logEnable) log.debug "Contact incorrectly open, so close."
                 close()
-                offsetOff()
     	    } else {
             	// Unschedule All
-				parent.unscheduleEvent("open")                    
-                parent.unscheduleMsg("startMsg") 
-                parent.unscheduleEvent("close")  
-                parent.unscheduleMsg("endMsg")   
+				parent.unscheduleEvent("open")
+                parent.unscheduleEvent("close")
     		}            
         }      
         // END NO EVENT FOUND
@@ -488,18 +289,6 @@ void poll() {
     	log.error "Failed to do poll: ${e}"
     }
 }
- 
-private Date msgTimeOffset(int minutes, Date originalTime){
-   if (parent.logEnable) log.trace "Gcal Event Sensor: msgTimeOffset()"
-   final long ONE_MINUTE_IN_MILLISECONDS = 60000;
-
-   long currentTimeInMs = originalTime.getTime()
-   Date offsetTime = new Date(currentTimeInMs + (minutes * ONE_MINUTE_IN_MILLISECONDS))
-   
-   if (parent.logEnable) log.trace "offsetTime = ${offsetTime}"
-   return offsetTime
-}
-
 
 def getMapHTML() {
 	def html = """

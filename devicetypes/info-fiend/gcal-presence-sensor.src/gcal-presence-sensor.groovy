@@ -43,52 +43,8 @@ metadata {
         attribute "eventSummary", "string"
         attribute "arriveTime", "number"
         attribute "departTime", "number"
-        attribute "startMsg", "string"
-        attribute "endMsg", "string"  
         attribute "deleteInfo", "string"  
-	}
-
-	simulator {
-		status "present": "presence: present"
-		status "not present": "presence: not present"
-	}
-
-	tiles(scale: 2) {
-		// You only get a presence tile view when the size is 3x3 otherwise it's a value tile
-		standardTile("presence", "device.presence", width: 3, height: 3, canChangeBackground: true, inactiveLabel: false, canChangeIcon: true) {
-			state("present", label:'${name}', icon:"st.presence.tile.mobile-present", action:"departed", backgroundColor:"#53a7c0")
-			state("not present", label:'${name}', icon:"st.presence.tile.mobile-not-present", action:"arrived", backgroundColor:"#CCCC00")
-		}
-        
-		standardTile("notPresentBtn", "device.fake", width: 3, height: 2, decoration: "flat") {
-			state("default", label:'AWAY', backgroundColor:"#CCCC00", action:"departed")
-		}
-
-		standardTile("presentBtn", "device.fake", width: 3, height: 2, decoration: "flat") {
-			state("default", label:'HERE', backgroundColor:"#53a7c0", action:"arrived")
-		}
-
-        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width:3, height: 3) {
-            state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
-        }
-                
-        valueTile("summary", "device.eventSummary", inactiveLabel: false, decoration: "flat", width: 6, height: 3) {
-            state "default", label:'${currentValue}'
-        }
-		
-        valueTile("deleteInfo", "device.deleteInfo", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
-            state "default", label:'To remove this device from ST - delete the corresponding GCal Search Trigger.'
-        }
-
-
-		main("presence")
-		details([
-			"summary", "presence", "refresh", "deleteInfo" 	//"notPresentBtn", "presentBtn",
-		]) 
-	}
-
-        
-       
+	}  
 }
 
 def installed() {
@@ -129,10 +85,6 @@ def present() {
     if (parent.logEnable) log.debug "Scheduling Close for: ${departTime}"
     sendEvent("name":"departTime", "value":departTime)
     parent.scheduleEvent("depart", departTime, [overwrite: true])
-    
-    //AskAlexaMsg    
-	def askAlexaMsg = device.currentValue("startMsg")	
-	parent.askAlexaStartMsgQueue(askAlexaMsg)     
 }
 
 
@@ -154,11 +106,7 @@ def away() {
 	if (parent.logEnable) log.trace "away():"
     
 	sendEvent(name: "switch", value: "off")
-    sendEvent(name: 'presence', value: 'not present', isStateChange: true)   
-    
-     //AskAlexaMsg
-	def askAlexaMsg = device.currentValue("endMsg")	
-	parent.askAlexaEndMsgQueue(askAlexaMsg)   
+    sendEvent(name: 'presence', value: 'not present', isStateChange: true)
    	
 }
 
@@ -221,13 +169,11 @@ def poll() {
 			sendEvent("name":"eventSummary", "value":eventSummary, isStateChange: true)   
             
 			//Set the closeTime and endMeg before opening an event in progress
-	        //Then use in the open() call for scheduling close and askAlexaMsgQueue
+	        //Then use in the open() call for scheduling close
 
-            sendEvent("name":"departTime", "value":end)           
-        	sendEvent("name":"endMsg", "value":endMsg)
+            sendEvent("name":"departTime", "value":end)
                     
-			sendEvent("name":"arriveTime", "value":start)           
-			sendEvent("name":"startMsg", "value":startMsg)
+			sendEvent("name":"arriveTime", "value":start)
 
       		// ALREADY IN EVENT?	        	                   
 	           // YES

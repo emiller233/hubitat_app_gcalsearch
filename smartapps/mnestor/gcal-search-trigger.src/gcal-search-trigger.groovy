@@ -48,7 +48,7 @@ definition(
 
 preferences {
 	page(name: "selectCalendars")
-   	page(name: "notifications")
+   	page(name: "offset")
 	page(name: "nameTrigger")    
 }
 
@@ -68,12 +68,12 @@ def selectCalendars() {
     } catch (e) {
     	return dynamicPage(name: "selectCalendars", title: "Missing Device", install: false, uninstall: false) {
         	section ("Error") {
-            	paragraph "We can't seem to create a child device, did you install both associated device type handler?"
+            	paragraph "We can't seem to create a child device, did you install both associated drivers?"
             }
         }
     }
     
-    return dynamicPage(name: "selectCalendars", title: "Create new calendar search", install: false, uninstall: state.installed, nextPage: "notifications" ) {
+    return dynamicPage(name: "selectCalendars", title: "Create new calendar search", install: false, uninstall: state.installed, nextPage: "offset" ) {
     	section("Required Info") {                               
                //we can't do multiple calendars because the api doesn't support it and it could potentially cause a lot of traffic to happen
             input name: "watchCalendars", title:"", type: "enum", required:true, multiple:false, description: "Which calendar do you want to search?", options:calendars, submitOnChange: true                
@@ -103,50 +103,29 @@ def selectCalendars() {
 	}       
 }
 
-def notifications(params) {
-	if (parent.logEnable) log.trace "notifications()"
+def offset(params) {
+	if (parent.logEnable) log.trace "offset()"
 
 	def isSMS = false
 	if (sendSmsMsg == "Yes") { isSMS = true }
-	return dynamicPage(name: "notifications", title: "Notification Options", install: false, nextPage: "nameTrigger" ) {
+	return dynamicPage(name: "offset", title: "Offset Options", install: false, nextPage: "nameTrigger" ) {
 
-		section("Optional - Receive Event Notifications?") {
-           	input name:"wantStartMsgs", type: "enum", title: "Send notification of event start?", required: true, multiple: false, options: ["Yes", "No"], defaultValue: "No", submitOnChange: true
-			if (wantStartMsgs == "Yes") {                	
-	            input name:"startOffset", type:"number", title:"Number of Minutes to Offset From Start of Calendar Event", required: false , range:"*..*"
-			}
-                
-            input name:"wantEndMsgs", type: "enum", title: "Send notification of event end?", required: true, multiple: false, options: ["Yes", "No"], defaultValue: "No", submitOnChange: true                
-			if (wantEndMsgs == "Yes") {
-	            input name:"endOffset", type:"number", title:"Number of Minutes to Offset From End of Calendar Event", required: false , range:"*..*"
-			}
+		section("Optional - Set offset times?") {
+           	input name:"startOffset", type:"number", title:"Number of Minutes to Offset From Start of Calendar Event", required: false , range:"*..*"
+			
+	        input name:"endOffset", type:"number", title:"Number of Minutes to Offset From End of Calendar Event", required: false , range:"*..*"
          }
          
-         section("Event Notification Time Tips", hideable:true, hidden:true) {            
-          	paragraph "If you want the notification to occur BEFORE the start/end of the event, " + 
-              		  "then use a negative number for offset time.  For example, to receive a " +
-                      "notification 5 minutes beforehand, use an an offset of -5. \n\n" +
-                      "If you want the notification to occur AFTER the start/end of the event, " +
-                      "then use positive number for offset time.  For example, to receive a " +
-                      "notification 9 hours after event start, use an an offset of 540 (can be " +
+         section("Offset Time Tips", hideable:true, hidden:true) {            
+          	paragraph "If you want the offset to occur BEFORE the start/end of the event, " + 
+              		  "then use a negative number for offset time.  For example, to set it " +
+                      "to 5 minutes beforehand, use an offset of -5. \n\n" +
+                      "If you want it to occur AFTER the start/end of the event, " +
+                      "then use positive number for offset time.  For example, to set it " +
+                      "to 9 hours after event start, use an an offset of 540 (can be " +
                       "helpful for all-day events, which start at midnight)." 
              	      "of the calendar event, enter number of minutes to offset here."
          }
-
-		if (wantStartMsgs == "Yes" || wantEndMsgs == "Yes") {
-	        section( "Optional - Receive Event Notifications using Ask Alexa" ) {
-				input "sendAANotification", "enum", title: "Send Event Notifications to Ask Alexa Message Queue?", options: ["Yes", "No"], defaultValue: "No", required: false
-        	}
-            
-			section( "Optional - Receive Event Notifications via Push or SMS" ) {
-		    //   	input("recipients", "contact", title: "Send notifications to", required: false) 
-	            input "sendPushMessage", "enum", title: "Send push notification?", options: ["Yes", "No"], required: false
-	            input "sendSmsMessage", "enum", title: "Send SMS notification?", options: ["Yes", "No"], required: false, submitOnChange: true                
-    	       	if (sendSmsMessage == "Yes") {
-                	input "phone", "phone", title: "Enter Phone Number to receive SMS:", required: isSMS
-        		}
-            }            	
-        }
 	}
 }
 
@@ -216,9 +195,6 @@ def initialize() {
 	} else if (eventOrPresence == "Presence") {        
 	    device.label = "${settings.name} Presence"    
     }
-
-    //Currently deletes the queue at midnight
-	schedule("0 0 0 * * ?", queueDeletionHandler)
 }
 
 def getDevice() {
@@ -227,11 +203,9 @@ def getDevice() {
     if (!childCreated()) {
 	    def calName = state.calName
     	if (eventOrPresence == "Contact") {        	
-	        device = addChildDevice(getNamespace(), getEventDeviceHandler(), getDeviceID(), null, [label: "${settings.name}", calendar: watchCalendars, hub:hub, offsetNotify: "off", completedSetup: true])
-            
+	        device = addChildDevice(getNamespace(), getEventDeviceHandler(), getDeviceID(), null, [label: "${settings.name}", calendar: watchCalendars, hub:hub, completedSetup: true])
     	} else if (eventOrPresence == "Presence") {
 			device = addChildDevice(getNamespace(), getPresenceDeviceHandler(), getDeviceID(), null, [label: "${settings.name}", calendar: watchCalendars, hub:hub, completedSetup: true])
-            
 		}
 	} else {
         device = getChildDevice(getDeviceID())
@@ -269,110 +243,9 @@ def poll() {
 	getDevice().poll()
 }
 
-private startMsg() {
-    if (settings.wantStartMsgs == "Yes") {
-		if (parent.logEnable) log.trace "startMsg():"
-    	def myApp = settings.name
-    	def msgText = state.startMsg ?: "Error finding start message"
-        
-		if (sendAANotification == "Yes") {
-	       if (parent.logEnable)  log.debug( "Sending start event notification to AskAlexaMsgQueue." )        
-        	sendLocationEvent(name: "AskAlexaMsgQueue", value: myApp, isStateChange: true, descriptionText: msgText, unit: myApp)  
-        }    
-
-/**        if ( recipients ) {
-        	if (parent.logEnable) log.debug( "Sending start event to selected contacts." )
-	        sendSms( recipients, msgText )
-    	}
-**/
-
-        if ( sendPushMessage != "No" ) {
-        	if (parent.logEnable) log.debug( "Sending start event notification via push." )
-	        sendPush( msgText )
-    	}
-
-	    if ( phone ) {
-    	   if (parent.logEnable)  log.debug( "Sending start event notification via SMS." )
-        	sendSms( phone, msgText )
-	    }
-                
-        try {
-    		getDevice().offsetOn()
-	    } catch (e) {
-			log.warn "Unable to find device's offsetOn function - device is using version ${dVersion()}."        	        	
-    	}
-        
-	} else {
-    	if (parent.logEnable) log.trace "No Start Msgs"
-	}    
-}
-
-private endMsg() {
-    if (settings.wantEndMsgs == "Yes") {
-		if (parent.logEnable) log.trace "endMsg():"
-    	def myApp = settings.name
-    	def msgText = state.endMsg ?: "Error finding end message"
-        
-		if (sendAANotification == "Yes") {
-	       if (parent.logEnable) log.debug( "Sending end event notification to AskAlexaMsgQueue." )
-        	sendLocationEvent(name: "AskAlexaMsgQueue", value: myApp, isStateChange: true, descriptionText: msgText, unit: myApp)  
-        }    
-        
-/**        if ( recipients ) {
-        	if (parent.logEnable) log.debug( "Sending end event to selected contacts." )
-	        sendSms( recipients, msgText )
-    	}
-**/
-        if ( sendPushMessage == "Yes" ) {
-        	if (parent.logEnable) log.debug( "Sending end event notification via push." )
-	        sendPush( msgText )
-    	}
-
-	    if ( phone ) {
-    	   if (parent.logEnable)  log.debug( "Sending end event notification via SMS." )
-        	sendSms( phone, msgText )
-	    }
-        
-        try {
-    		getDevice().offsetOff()
-	    } catch (e) {
-			if (parent.logEnable) log.warn "Unable to find device's offsetOff function - device is using version ${dVersion()}."        	        	
-    	}
-        
-    } else {    	
-       if (parent.logEnable)  log.trace "No End Msgs"
-	}    
-}
-
-
-def queueDeletionHandler() {
-	askAlexaMsgQueueDelete() 
-}
-
-private askAlexaMsgQueueDelete() {
-	if (parent.logEnable) log.trace "askAlexaMsgQueueDelete():"
-    def myApp = settings.name
-    
-	sendLocationEvent(name: "AskAlexaMsgQueueDelete", value: myApp, isStateChange: true, unit: myApp)  
-
-}
-
 def scheduleEvent(method, time, args) {
     def device = getDevice()
    	if (parent.logEnable) log.trace "scheduleEvent( ${method}, ${time}, ${args} ) from ${device}." 
-	runOnce( time, method, args)	
-}
-
-def scheduleMsg(method, time, msg, args) {
-    def device = getDevice()
-    if (method == "startMsg") {
-    	if (parent.logEnable) log.info "Saving ${msg} as state.startMsg ."
-    	state.startMsg = msg
-	} else {
-    	if (parent.logEnable) log.info "Saving ${msg} as state.endMsg ."    
-    	state.endMsg = msg
-    }
-   if (parent.logEnable) log.trace "scheduleMsg( ${method}, ${time}, ${args} ) from ${device}." 
 	runOnce( time, method, args)	
 }
 
@@ -381,25 +254,6 @@ def unscheduleEvent(method) {
     try { 
     	unschedule( "${method}" ) 
     } catch (e) {}       
-}
-
-def unscheduleMsg(method) {
-	if (parent.logEnable) log.trace "unscheduleMsg( ${method} )" 
-    try { 
-    	unschedule( "${method}" ) 
-    } catch (e) {}       
-}
-
-def checkMsgWanted(type) {
-	def isWanted = false
-	if (type == "startMsg") {
-		if (wantStartMsgs=="Yes") {isWanted = true} 
-    } else if (type == "endMsg") {
-		if (wantEndMsgs=="Yes") {isWanted = true}
-    }
-    
-   if (parent.logEnable) log.debug "${type} Msgs Wanted? = ${isWanted}"
-    return isWanted    
 }
 
 def open() {
@@ -428,8 +282,6 @@ def depart() {
 private uninstalled() {
     log.trace "uninstalled():"
     
-    log.info "Delete any existing messages in AskAlexa message queue."
-    askAlexaMsgQueueDelete() 
     log.info "Delete all child devices."    
 	deleteAllChildren()
 }
