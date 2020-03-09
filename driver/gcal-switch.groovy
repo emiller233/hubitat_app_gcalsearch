@@ -1,6 +1,6 @@
 /**
- *  Copyright 2020 Michael Ritchie
- *  Thank you to Mike Nestor & Anthony Pastor for their contributions to the GCal Event Sensor which some code from this driver leverages
+ *  Copyright 2017 Mike Nestor & Anthony Pastor & Michael Ritchie
+ *  Hubitat conversion by cometfish.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -13,94 +13,181 @@
  *
  */
 
-metadata {
-	definition (name: "GCal Switch", namespace: "mlritchie", author: "Michael Ritchie") {
-		capability "Sensor"
-        capability "Polling"
-		capability "Refresh"
-        capability "Switch"
-        
-        attribute "eventTitle", "string"
-        attribute "eventLocation", "string"
-        attribute "eventStartTime", "string"
-        attribute "eventEndTime", "string"
-        attribute "eventAllDay", "bool"
-	}
+definition(
+    name: "GCal Search Trigger",
+    namespace: "mnestor",
+    author: "Mike Nestor and Anthony Pastor. Hubitat conversion by cometfish. Further edits by mlritchie",
+    description: "Creates & Controls virtual contact (event) or presence sensors.",
+    category: "My Apps",
+    parent: "mnestor:GCal Search",
+    iconUrl: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal.png",
+    iconX2Url: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal%402x.png",
+    iconX3Url: "https://raw.githubusercontent.com/mnestor/GCal-Search/icons/icons/GCal%402x.png",
+) {}
+
+preferences {
+	page(name: "selectCalendars")
+}
+
+private version() {
+	def text = "20200306.1"
+}
+
+def selectCalendars() {
+	logDebug "selectCalendars()"
     
-    preferences {
-		input name: "isDebugEnabled", type: "bool", title: "Enable debug logging?", defaultValue: false, required: false
-        input name: "switchValue", type: "enum", title: "Switch Default Value", required: true, options:["on","off"]
-    }
+    def calendars = parent.getCalendarList()
+    logDebug "Calendar list = ${calendars}"
+    
+    return dynamicPage(name: "selectCalendars", title: "Create new calendar search", install: true, uninstall: true, nextPage: "" ) {
+    	section("Required Info") {                               
+            //we can't do multiple calendars because the api doesn't support it and it could potentially cause a lot of traffic to happen
+            input name: "watchCalendars", title:"", type: "enum", required:true, multiple:false, description: "Which calendar do you want to search?", options:calendars, submitOnChange: true
+            paragraph "Multiple search strings may be entered separated by commas.  By default the search string is matched to the calendar title using a starts with search. Include a * to perform a contains search or multiple non consecutive words. For example to match both Kids No School and Kids Late School enter Kids*School."
+            input name: "search", type: "text", title: "Search String", required: true, submitOnChange: true  
+        }
+        
+        if ( settings.search ) {
+            section("Preferences") {
+                input name: "timeToRun", type: "time", title: "Time to run", required: true
+                def defName = settings.search - "\"" - "\"" //.replaceAll(" \" [^a-zA-Z0-9]+","")
+                input name: "deviceName", type: "text", title: "Device Name", required: true, multiple: false, defaultValue: "${defName} Switch"
+                paragraph "Set Switch Default Value to the switch value preferred when there is no calendar entry. If a calendar entry is found, the switch will toggle."
+                input name: "switchValue", type: "enum", title: "Switch Default Value", required: true, defaultValue: "on", options:["on","off"]
+                input name: "appName", type: "text", title: "Trigger Name", required: true, multiple: false, defaultValue: "${defName}", submitOnChange: true
+                input name: "isDebugEnabled", type: "bool", title: "Enable debug logging?", defaultValue: false, required: false
+            }
+        }
+            
+        if ( state.installed ) {
+	    	section ("Remove Trigger and Corresponding Device") {
+            	paragraph "ATTENTION: The only way to uninstall this trigger and the corresponding device is by clicking the button below.\n" +                		
+                		  "Trying to uninstall the corresponding device from within that device's preferences will NOT work."
+            }
+    	}   
+	}       
 }
 
 def installed() {
-    logDebug "GCal Switch: installed()"
-    on()
-    initialize()
+	logDebug "Installed with settings: ${settings}"
+	initialize()
+    
+    log.debug "switchValue: ${switchValue}"
 }
 
 def updated() {
-    logDebug "GCal Switch: updated()"   
+	logDebug "Updated with settings: ${settings}"
+	unschedule()
+    
 	initialize()
 }
 
 def initialize() {
-    refresh()
+    logDebug "initialize()"
+    state.installed = true
+   	
+    // Sets Label of Trigger
+    app.updateLabel(settings.appName)
+    
+    state.deviceID = "GCal_${app.id}"
+    def childDevice = getChildDevice(state.deviceID)
+    if (!childDevice) {
+		logDebug("creating device: deviceID: ${state.deviceID}")
+        childDevice = addChildDevice("mlritchie", "GCal Switch", "GCal_${app.id}", null, [name: "GCal Switch", label: deviceName])
+		childDevice.updateSetting("isDebugEnabled",[value:"${isDebugEnabled}",type:"bool"])
+        childDevice.updateSetting("switchValue",[value:"${switchValue}",type:"enum"])
+        logDebug("created device: ${state.deviceID}")
+    }
+
+    schedule(timeToRun, poll)
 }
 
-def parse(String description) {
-
-}
-
-// refresh status
-def refresh() {
-    logDebug "GCal Switch: refresh()"
-    poll() // and do one now
+def getNextEvents() {
+    logDebug "GCalSearchTrigger: getNextEvents() child"
+    def search = (!settings.search) ? "" : settings.search
+    def items = parent.getNextEvents(settings.watchCalendars, search)
+    def item = []
+    
+    if (items.size() > 0) {
+        def searchTerms = search.toString().split(",")
+        def foundMatch = false
+        for (int s = 0; s < searchTerms.size(); s++) {
+            def searchTerm = searchTerms[s].trim()
+            for (int i = 0; i < items.size(); i++) {
+                def eventTitle = items[i].eventTitle
+                
+                if (searchTerm.indexOf("*") > -1) {
+                    def searchList = searchTerm.toString().split("\\*")
+                    for (int sL = 0; sL < searchList.size(); sL++) {
+                        def searchItem = searchList[sL].trim()
+                        if (eventTitle.indexOf(searchItem) > -1) {
+                            foundMatch = true
+                        } else {
+                            foundMatch = false
+                            break
+                        }
+                    }
+                    
+                    if (foundMatch) {
+                        item = items[i]
+                        break
+                    }
+                } else {
+                    if (eventTitle.startsWith(searchTerm)) {
+                        foundMatch = true
+                        item = items[i]
+                        break
+                    }
+                }
+            }
+            
+            if (foundMatch) {
+                break
+            }
+        }
+        
+    }
+    
+    return item
 }
 
 def poll() {
-    logDebug "GCal Switch: poll()"
-    def result = []
-    def item = parent.getNextEvents()
-    def isOn = device.currentValue("switch") == switchValue
-    if (item && item.eventTitle) {
-        logDebug "GCal Switch: event found, item: ${item}"
-        result << sendEvent(name: "eventTitle", value: item.eventTitle )
-        result << sendEvent(name: "eventLocation", value: item.eventLocation )
-        result << sendEvent(name: "eventAllDay", value: item.eventAllDay )
-        result << sendEvent(name: "eventStartTime", value: item.eventStartTime )
-        result << sendEvent(name: "eventEndTime", value: item.eventEndTime )
-        
-        if (isOn) {
-            off()
-        }
-    } else {
-        logDebug "GCal Switch: no events found, isOn: ${isOn}"
-        if (!isOn) {
-            on()
+	logDebug "GCalSearchTrigger::poll()"
+    def childDevice = getChildDevice(state.deviceID)
+    childDevice.poll()
+}
+
+private uninstalled() {
+    logDebug "uninstalled():"
+    
+    logDebug "Delete all child devices."    
+	deleteAllChildren()
+}
+
+private deleteAllChildren() {
+    logDebug "deleteAllChildren():"
+    
+    getChildDevices().each {
+    	logDebug "Delete $it.deviceNetworkId"
+        try {
+            deleteChildDevice(it.deviceNetworkId)
+        } catch (Exception e) {
+            log.error "Fatal exception? $e"
         }
     }
-    
-    return result
 }
 
-def on() {
-    logDebug "GCal Switch: on()"
-    def result = []
-    result << sendEvent(name: "switch", value: switchValue)
-    result << sendEvent(name: "eventTitle", value: " ")
-    result << sendEvent(name: "eventLocation", value: " ")
-    result << sendEvent(name: "eventAllDay", value: " ")
-    result << sendEvent(name: "eventStartTime", value: " ")
-    result << sendEvent(name: "eventEndTime", value: " ")
-    
-    return result
+private childCreated() {
+    def isChild = getChildDevice("GCal_${app.id}") != null
+    logDebug "childCreated? ${isChild}"
+    return isChild
 }
 
-def off() {
-    def offValue = switchValue == "on" ? "off" : "on"
-    logDebug "GCal Switch: off()"
-    sendEvent(name: "switch", value: offValue)
+private textVersion() {
+    def text = "Trigger Version: ${ version() }"
+}
+private dVersion(){
+	def text = "Device Version: ${getChildDevices()[0].version()}"
 }
 
 private logDebug(msg) {
