@@ -21,7 +21,7 @@ Steps to set this up...
         
 2) Copy the code for the 2 Apps "GCal Search" and "GCal Search Trigger" into Hubitat, under Apps Code
         
-3) Copy the code for the 2 Devices "GCal Switch" into Hubitat, under Drivers Code
+3) Copy the code for the "GCal Switch" Driver into Hubitat, under Drivers Code
 
 4) In Hubitat, go to the Apps page and install the "GCal Search" app. 
         -This will walk you through connecting to Google and selecting a calendar and search terms.
