@@ -41,8 +41,9 @@ def selectCalendars() {
     
     return dynamicPage(name: "selectCalendars", title: "Create new calendar search", install: true, uninstall: true, nextPage: "" ) {
     	section("Required Info") {                               
-               //we can't do multiple calendars because the api doesn't support it and it could potentially cause a lot of traffic to happen
+            //we can't do multiple calendars because the api doesn't support it and it could potentially cause a lot of traffic to happen
             input name: "watchCalendars", title:"", type: "enum", required:true, multiple:false, description: "Which calendar do you want to search?", options:calendars, submitOnChange: true
+            paragraph "Multiple search strings may be entered separated by commas.  By default the search string is matched to the calendar title using a starts with search. Include a * to perform a contains search or multiple non consecutive words. For example to match both Kids No School and Kids Late School enter Kids*School."
             input name: "search", type: "text", title: "Search String", required: true, submitOnChange: true  
         }
         
@@ -51,6 +52,7 @@ def selectCalendars() {
                 input name: "timeToRun", type: "time", title: "Time to run", required: true
                 def defName = settings.search - "\"" - "\"" //.replaceAll(" \" [^a-zA-Z0-9]+","")
                 input name: "deviceName", type: "text", title: "Device Name", required: true, multiple: false, defaultValue: "${defName} Switch"
+                paragraph "Set Switch Default Value to the switch value preferred when there is no calendar entry. If a calendar entry is found, the switch will toggle."
                 input name: "switchValue", type: "enum", title: "Switch Default Value", required: true, defaultValue: "on", options:["on","off"]
                 input name: "appName", type: "text", title: "Trigger Name", required: true, multiple: false, defaultValue: "${defName}", submitOnChange: true
                 input name: "isDebugEnabled", type: "bool", title: "Enable debug logging?", defaultValue: false, required: false
@@ -110,14 +112,14 @@ def getNextEvents() {
         def searchTerms = search.toString().split(",")
         def foundMatch = false
         for (int s = 0; s < searchTerms.size(); s++) {
-            def searchTerm = searchTerms[s]
+            def searchTerm = searchTerms[s].trim()
             for (int i = 0; i < items.size(); i++) {
                 def eventTitle = items[i].eventTitle
                 
                 if (searchTerm.indexOf("*") > -1) {
                     def searchList = searchTerm.toString().split("\\*")
                     for (int sL = 0; sL < searchList.size(); sL++) {
-                        def searchItem = searchList[sL]
+                        def searchItem = searchList[sL].trim()
                         if (eventTitle.indexOf(searchItem) > -1) {
                             foundMatch = true
                         } else {
