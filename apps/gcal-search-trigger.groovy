@@ -116,7 +116,7 @@ def getNextEvents() {
             for (int i = 0; i < items.size(); i++) {
                 def eventTitle = items[i].eventTitle
                 
-                if (searchTerm.indexOf("*") > -1) {
+                if (searchTerm.indexOf("*") > -1 && searchTerm != "*") {
                     def searchList = searchTerm.toString().split("\\*")
                     for (int sL = 0; sL < searchList.size(); sL++) {
                         def searchItem = searchList[sL].trim()
@@ -133,7 +133,7 @@ def getNextEvents() {
                         break
                     }
                 } else {
-                    if (eventTitle.startsWith(searchTerm)) {
+                    if (eventTitle.startsWith(searchTerm) || searchTerm == "*") {
                         foundMatch = true
                         item = items[i]
                         break
